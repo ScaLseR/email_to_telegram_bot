@@ -10,16 +10,21 @@ import configparser
 from email.header import Header, decode_header, make_header
 from email.mime.text import MIMEText
 
-#Отправка ответа на входящее письмо
-def send_mail_to_sender(addr):
+#Получение значений параметров из файла config.ini
+def get_param(part, param):
     config = configparser.ConfigParser()
     config.read('config.ini', encoding='utf-8')
-    host = config.get('email', 'host')
-    port = config.get('email', 'port')
-    from_ = config.get('email', 'from')
-    subject = config.get('email', 'subject')
-    passw = config.get('email', 'pass')
-    msg = config.get('email', 'msg')
+    rez = config.get(part, param)
+    return rez
+
+#Отправка ответа на входящее письмо
+def send_mail_to_sender(addr):
+    host = get_param('email', 'host')
+    port = get_param('email', 'port')
+    from_ = get_param('email', 'from')
+    subject = get_param('email', 'subject')
+    passw = get_param('email', 'pass')
+    msg = get_param('email', 'msg')
     message = MIMEText(msg, 'utf-8')
     message['Subject'] = Header(subject, 'utf-8')
     message['From'] = from_
@@ -31,12 +36,9 @@ def send_mail_to_sender(addr):
 
 #Отправка входящего письма в чат телеграмма
 def send_mail_to_tg(text):
-    config = configparser.ConfigParser()
-    config.read('config.ini', encoding='utf-8')
-    api_token = config.get('tg', 'api_token')
-    url = config.get('tg', 'url')
-    chat_id = config.get('tg', 'chat_id')
-    print(config.get('tg', 'api_token'), config.get('tg', 'url'), config.get('tg', 'chat_id'))
+    api_token = get_param('tg', 'api_token')
+    url = get_param('tg', 'url')
+    chat_id = get_param('tg', 'chat_id')
     requests.post(f'{url}{api_token}/sendMessage?chat_id={chat_id}&text={text}')
 
 #изменение кодировки заголовка письма в utf-8 из base64
@@ -44,29 +46,16 @@ def dec_hed(message):
     bytes, mail_subject = decode_header(message)[0]
     return bytes.decode(mail_subject)
 
-#замена в теле письма <div> и </div>
+#Замена в теле письма <div> и </div>
 def repl_div(mail_body):
     s = mail_body.replace('<div>', '')
     rez_mail_body = s.replace('</div>', '\n')
     return rez_mail_body
 
+#Создание сообщения для отправки в телеграм
 def add_mail_text(mail_from, mail_subject):
-    #если письмо пришло с mail.dumask
-    #if '@dumask.ru' in mail_from:
-    #    rez_mail_subject = dec_hed(mail_subject)
-    #    rez_mail_body = quopri.decodestring(mail_body)
-    #    text ='От: '+mail_from+'\n'+'Тема: '+rez_mail_subject+'\n'+'Содержание: '+ rez_mail_body.decode('windows-1251')
-    #если письмо пришло с mail.yandex
-    #if '@yandex.ru' in mail_from:
-    #    rez_mail_body = repl_div(mail_body)
-     #   rez_mail_subject = dec_hed(mail_subject)
-     #   text ='От: '+mail_from+'\n'+'Тема: '+rez_mail_subject+'\n'+'Содержание: '+ rez_mail_body
-
-    #if '@mail.ru' in mail_from:
-    #rez_mail_body = repl_div(mail_body)
     rez_mail_subject = dec_hed(mail_subject)
     text ='От: '+mail_from+'\n'+'Тема: '+rez_mail_subject+'\n'+'Содержание: '
-
     send_mail_to_tg(text)
     send_mail_to_sender(mail_from)
 
@@ -116,10 +105,11 @@ def read(username, password, host ,sender_of_interest=None):
 #Проверка почтового ящика каждые 60 секунд
 def start():
     i = 1
-    config = configparser.ConfigParser()
-    config.read('config.ini', encoding='utf-8')
     while i !=0:
-        read(config.get('email', 'from'), config.get('email', 'pass'),config.get('email', 'host'))
+        from_ = get_param('email', 'from')
+        passw = get_param('email', 'pass')
+        host = get_param('email', 'host')
+        read(from_, passw, host)
         time.sleep(60)
 
 if __name__ == '__main__':
