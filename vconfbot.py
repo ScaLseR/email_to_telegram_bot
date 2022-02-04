@@ -7,6 +7,7 @@ import quopri
 import time
 import smtplib
 import configparser
+import re
 from email.header import Header, decode_header, make_header
 from email.mime.text import MIMEText
 
@@ -17,7 +18,7 @@ def get_param(part, param):
     rez = config.get(part, param)
     return rez
 
-#Отправка ответа на входящее письмо
+#Отправка ответа на полученное письмо
 def send_mail_to_sender(addr):
     host = get_param('email', 'host')
     port = get_param('email', 'port')
@@ -34,7 +35,7 @@ def send_mail_to_sender(addr):
     server.sendmail(from_, addr, message.as_string())
     server.close()
 
-#Отправка входящего письма в чат телеграмма
+#Отправка полученного письма в чат телеграмма
 def send_mail_to_tg(text):
     api_token = get_param('tg', 'api_token')
     url = get_param('tg', 'url')
@@ -46,6 +47,9 @@ def dec_hed(message):
     bytes, mail_subject = decode_header(message)[0]
     return bytes.decode(mail_subject)
 
+#конвертируем фио от кого пришло письмо
+#def dec_from_mail(message):
+
 #Замена в теле письма <div> и </div>
 def repl_div(mail_body):
     s = mail_body.replace('<div>', '')
@@ -53,23 +57,35 @@ def repl_div(mail_body):
     return rez_mail_body
 
 #Создание сообщения для отправки в телеграм
-def add_mail_text(mail_from, mail_subject):
+def add_mail_text(mail_from_name, mail_from, mail_subject, mail_body):
     rez_mail_subject = dec_hed(mail_subject)
-    text ='От: '+mail_from+'\n'+'Тема: '+rez_mail_subject+'\n'+'Содержание: '
+    rez_mail_from_name = dec_hed(mail_from_name)
+    text ='От: '+rez_mail_from_name+' '+mail_from+'\n'+'Тема: '+rez_mail_subject+'\n'+'Содержание: '+mail_body
     send_mail_to_tg(text)
     send_mail_to_sender(mail_from)
 
-#Получение данных от кого, тема и содержание письма
+def data_from_body(data):
+    if '<div>' in data:
+        rez = repl_div(data)
+
+    if re.search(r'=..=..', data):
+        rez1 = quopri.decodestring(data)
+        rez = rez1.decode('windows-1251')
+
+    return rez
+
+#Получение данных из email: от кого, тема и содержание письма
 def exp_data_from_email(mail_data):
     s = {}
     if len(mail_data) > 0:
         for i in range(len(mail_data)):
             s = mail_data[i]
             print('s[mail_from][1] ===', s['mail_from'][1])
+            print('s[mail_from][0] ===', s['mail_from'][0])
             print('s[mail_subject] ===', s['mail_subject'])
-            #print('s[body]===', s['body'])
-            #add_mail_text(s['mail_from'][1], s['mail_subject'], s['body'])
-            add_mail_text(s['mail_from'][1], s['mail_subject'])
+            print('s[body]===', s['body'])
+            body = data_from_body(s['body'])
+            add_mail_text(s['mail_from'][0], s['mail_from'][1], s['mail_subject'], body)
             s = {}
 
 #Получение непрочитанных писем из почтового ящика
@@ -79,10 +95,10 @@ def read(username, password, host ,sender_of_interest=None):
     imap.login(username, password)
     imap.select('INBOX')
 
-    if sender_of_interest:
-        status, response = imap.uid('search', None, 'UNSEEN', 'FROM {0}'.format(sender_of_interest))
-    else:
-        status, response = imap.uid('search', None, 'UNSEEN')
+    #if sender_of_interest:
+     #   status, response = imap.uid('search', None, 'UNSEEN', 'FROM {0}'.format(sender_of_interest))
+   # else:
+    status, response = imap.uid('search', None, 'UNSEEN')
     if status == 'OK':
         unread_msg_nums = response[0].split()
     else:
@@ -98,8 +114,8 @@ def read(username, password, host ,sender_of_interest=None):
         data_dict['mail_subject'] = email_message['Subject']
         data_dict['mail_from'] = email.utils.parseaddr(email_message['From'])
         data_dict['body'] = email_message.get_payload()
-        print('data_dict=====', data_dict)
         data_list.append(data_dict)
+        print('ddata_list ======', data_list)
         exp_data_from_email(data_list)
 
 #Проверка почтового ящика каждые 60 секунд
@@ -114,4 +130,7 @@ def start():
 
 if __name__ == '__main__':
     start()
+
+
+
 
