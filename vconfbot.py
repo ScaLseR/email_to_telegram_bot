@@ -8,6 +8,7 @@ import time
 import smtplib
 import configparser
 import re
+import datetime
 from email.header import Header, decode_header, make_header
 from email.mime.text import MIMEText
 
@@ -56,13 +57,20 @@ def repl_div(mail_body):
     rez_mail_body = s.replace('</div>', '\n')
     return rez_mail_body
 
-#Создание сообщения для отправки в телеграм
+#Пишем данные в лог файл
+def log_file(text):
+    date_time_now = datetime.datetime.now()
+    with open('log.txt', 'a') as file:
+        file.write(str(date_time_now) + '  ' + text+ '\n')
+        file.write('*****************************************************************\n')
+
+#Создание сообщения для отправки в телеграм и ответное письмо отправителю
 def add_mail_text(mail_from_name, mail_from, mail_subject, mail_body):
     rez_mail_subject = dec_hed(mail_subject)
-    rez_mail_from_name = dec_hed(mail_from_name)
-    text ='От: '+rez_mail_from_name+' '+mail_from+'\n'+'Тема: '+rez_mail_subject+'\n'+'Содержание: '+mail_body
+    text ='От: '+mail_from+'\n'+'Тема: '+rez_mail_subject+'\n'+'Содержание: '+mail_body
     send_mail_to_tg(text)
     send_mail_to_sender(mail_from)
+    log_file(text)
 
 def data_from_body(data):
     if '<div>' in data:
@@ -80,10 +88,6 @@ def exp_data_from_email(mail_data):
     if len(mail_data) > 0:
         for i in range(len(mail_data)):
             s = mail_data[i]
-            print('s[mail_from][1] ===', s['mail_from'][1])
-            print('s[mail_from][0] ===', s['mail_from'][0])
-            print('s[mail_subject] ===', s['mail_subject'])
-            print('s[body]===', s['body'])
             body = data_from_body(s['body'])
             add_mail_text(s['mail_from'][0], s['mail_from'][1], s['mail_subject'], body)
             s = {}
@@ -127,6 +131,7 @@ def start():
         host = get_param('email', 'host')
         read(from_, passw, host)
         time.sleep(60)
+
 
 if __name__ == '__main__':
     start()
